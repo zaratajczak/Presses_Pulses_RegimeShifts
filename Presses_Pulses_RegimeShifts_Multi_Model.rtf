@@ -1,0 +1,520 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;\red32\green0\blue99;\red102\green0\blue141;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs36 \cf2 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 ###########################################################################################\
+#  The following code is functions to run the multi-model tests (Box 2) "The interactive effects of \
+#  press/pulse intensity and duration on regime shifts at multiple scales" \
+#\
+# For eqns and parameters, see Table S2, S3.\
+###########################################################################################\
+\
+\
+###########################################################################################\
+# Start of Allee effects and harvesting model (Model 1 in Box 2)\
+###########################################################################################\
+\
+\
+#Parameters for Model 2, all following Table S2 unless otherwise noted\
+delta_t = 0.001\
+K = 100 \
+A = 15\
+Spatial_var = 0.5 #this is the "r" parameter, for single runs\
+gens = 500 #number of time steps\
+State_start = 100 #Initial conditions\
+Driver_start = 0.4 # H before and after press\
+Driver_pulse_amt = 0.2 # Intensity of harvesting press, for single runs\
+Driver_pulse_dur = 50 # Duration of harvesting press, for single runs\
+spatial_var_brack= 0.5 #sequence for all factorial values of press intensity and duration; this one is for the r parameter \
+dur_brack= seq(0,12.6, 0.01) # sequence for all factorial values of press intensity and duration; this one is for press duration\
+mag_brack=seq(0.1, 0.7, 0.01) # sequence for all factorial values of press intensity and duration; this one is for press intensity\
+\
+\
+\
+#the eqn for Model 1\
+Allee_growth_func = function(X, r, K, A, H, delta_t) \{\
+dXdt = delta_t * (r*X*(X/A-1)*(1-X/K)-H*X)\
+return(dXdt)\
+\}\
+\
+#Code for performing a single run of Model 1\
+Allee_single_run = function (gens, delta_t, State_start, Driver_start, Driver_pulse_amt, Driver_pulse_dur, Spatial_var)\{\
+\
+#this matrix holds the results of the simulation\
+results = matrix(NA, nrow = gens/delta_t, ncol = 3)\
+results[1,3] = State_start\
+colnames(results) = c("Time", "Driver", "State")\
+\
+#this matrix holds the driver variable over time\
+Driver_mat = matrix(Driver_start, nrow = gens/delta_t, ncol =1)\
+Driver_mat[(100/delta_t):(100/delta_t+Driver_pulse_dur/delta_t)] = Driver_start+Driver_pulse_amt \
+results[,2] = Driver_mat\
+\
+for(t in 1:(gens/delta_t-1))\{\
+\
+results[t+1, 3] =  results[t,3] + Allee_growth_func(X=results[t,3], r=Spatial_var, K=K, A=A, H=Driver_mat[t], delta_t=delta_t)\
+if (results[t+1,3]<=0) results[t+1,3] =0\
+\}\
+\
+\
+final_results = matrix(NA, nrow=gens, ncol=3)\
+for(g in 1:gens)\{\
+final_results[g, 1] = g\
+final_results[g, 2] = results[(g/delta_t), 2]\
+final_results[g, 3] = results[(g/delta_t), 3]\
+\}\
+\
+colnames(final_results) = c("Time", "Driver_Var", "State")\
+return(final_results)\
+\}\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+#end function for a single run of Model 1\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+\
+\
+#this function assesses factorial combinations of press duration, press intensity, and maximum population growth rate for Model 1\
+Allee_factorial= function (spatial_var_brack, dur_brack, mag_brack)\{\
+counter = 1\
+#this matrix holds the results for each combination of press duration, press intensity, and vegetation growth rate (and for each time step)\
+results = matrix(NA, nrow = gens*length(spatial_var_brack)*length(dur_brack)*length(mag_brack), ncol = 6)\
+\
+#this matrix is the final state (last time step) for each combination of press duration, press intensity, and vegetation growth rate\
+final_states = matrix (NA, nrow = length(spatial_var_brack)*length(dur_brack)*length(mag_brack), ncol = 6)\
+\
+\
+for(spV in 1:length(spatial_var_brack)) \{\
+for(dur in 1:length(dur_brack)) \{\
+for(mag in 1:length(mag_brack)) \{\
+\
+temp_results = Allee_single_run (gens=gens, delta_t=delta_t, State_start=State_start, Driver_start=Driver_start, Driver_pulse_amt=mag_brack[mag], Driver_pulse_dur=dur_brack[dur], Spatial_var=spatial_var_brack[spV])\
+\pard\pardeftab720\partightenfactor0
+\cf0 \expnd0\expndtw0\kerning0
+begin = 1+(counter-1)*gens\
+ending = counter*gens\'a0\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 \
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 1] = final_states [counter, 1]= mag_brack[mag]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 2] = final_states [counter, 2] = dur_brack[dur]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens):\kerning1\expnd0\expndtw0 (\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 3] = final_states [counter, 3] = spatial_var_brack[spV]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 4:6] = temp_results\
+final_states [counter, 4:6]  = temp_results[gens,]\
+counter = counter+1\
+\}\
+\}\
+\}\
+colnames(final_states) = c("Press_Intensity", "Press_Time", "Spatial_Var", "Time_Step", "Driver_Var", "State")\
+colnames(results) = c("Press_Intensity", "Press_Time", "Spatial_Var", "Time_Step", "Driver_Var", "State")\
+return(list(results,  final_states))\
+\}\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+#end function for factorial simulations of Model 1\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+\
+\
+#to get the data used for figures, use following code (after 'uncommenting' it):\
+#Allee_fact_data = Allee_factorial (spatial_var_brack=spatial_var_brack, dur_brack=dur_brack, mag_brack=mag_brack)[[2]]\
+\
+\
+###########################################################################################\
+# Start of lake eutrophication model (Model 2 in Box 2)\
+###########################################################################################\
+\
+\
+#Parameters for Model 2, all following Table S2 unless otherwise noted\
+a= 0.4\
+Spatial_var = 1 #the "b" parameter, for single runs\
+c=1\
+delta_t = 0.001\
+gens = 500 #time steps\
+Driver_start = 0.5 #driver variable value before and after press\
+Driver_pulse_amt = 0.8 #press intensity, for single runs\
+Driver_pulse_dur = 10 #press duration, for single runs\
+State_start= 0.2 #initial conditions\
+spatial_var_brack= 1 #sequence for all factorial values of press intensity and duration; this one is for the "b" parameter \
+dur_brack= seq(0, 2.5, 0.01) # sequence for all factorial values of press intensity and duration; this one is for press duration\
+mag_brack=seq(0, 1.2, 0.01) # sequence for all factorial values of press intensity and duration; this one is for press intensity\
+\
+\
+#the eqn for Model 2\
+Carpenter_growth_func = function(a, b, X, c, delta_t) \{\
+dXdt = delta_t * (a - b* X + c * X^8/(X^8 + 1))\
+return(dXdt)\
+\}\
+\
+#Code for performing a single run of Model 2\
+Carpenter_single_run = function (c, gens, delta_t, State_start, Driver_start, Driver_pulse_amt, Driver_pulse_dur, Spatial_var)\{\
+\
+#this matrix holds the results of the simulation\
+results = matrix(NA, nrow = gens/delta_t, ncol = 3)\
+results[1,3] = State_start\
+colnames(results) = c("Time", "Driver", "State")\
+\
+#this matrix holds the driver variable over time\
+Driver_mat = matrix(Driver_start, nrow = gens/delta_t, ncol =1)\
+Driver_mat[(100/delta_t):(100/delta_t+Driver_pulse_dur/delta_t)] = Driver_start+Driver_pulse_amt \
+results[,2] = Driver_mat\
+\
+for(t in 1:(gens/delta_t-1))\{\
+results[t+1, 3] =  results[t,3] + Carpenter_growth_func(a=Driver_mat[t], b=Spatial_var, X=results[t,3], c=c, delta_t=delta_t)\
+if (results[t+1,3]<=0) results[t+1,3] =0\
+\}\
+\
+\
+final_results = matrix(NA, nrow=gens, ncol=3)\
+for(g in 1:gens)\{\
+final_results[g, 1] = g\
+final_results[g, 2] = results[(g/delta_t), 2]\
+final_results[g, 3] = results[(g/delta_t), 3]\
+\}\
+\
+colnames(final_results) = c("Time", "Driver_Var", "State")\
+return(final_results)\
+\}\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+#end function for a single run of Model 2\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 \
+\
+#this function assesses factorial combinations of press duration, press intensity, and the b parameter for Model 2\
+Carpenter_factorial = function (spatial_var_brack, dur_brack, mag_brack)\{\
+counter = 1\
+#this matrix holds the results for each combination of press duration, press intensity, and vegetation growth rate (and for each time step)\
+results = matrix(NA, nrow = gens*length(spatial_var_brack)*length(dur_brack)*length(mag_brack), ncol = 6)\
+\
+#this matrix is the final state (last time step) for each combination of press duration, press intensity, and vegetation growth rate\
+final_states = matrix (NA, nrow = length(spatial_var_brack)*length(dur_brack)*length(mag_brack), ncol = 6)\
+\
+\
+for(spV in 1:length(spatial_var_brack)) \{\
+for(dur in 1:length(dur_brack)) \{\
+for(mag in 1:length(mag_brack)) \{\
+temp_results = Carpenter_single_run (c=c, gens=gens, delta_t, State_start=State_start, Driver_start=Driver_start, Driver_pulse_amt=mag_brack[mag], Driver_pulse_dur=dur_brack[dur], Spatial_var=spatial_var_brack[spV])\
+\pard\pardeftab720\partightenfactor0
+\cf0 \expnd0\expndtw0\kerning0
+begin = 1+(counter-1)*gens\
+ending = counter*gens\'a0\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 \
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 1] = final_states [counter, 1]= mag_brack[mag]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 2] = final_states [counter, 2] = dur_brack[dur]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens):\kerning1\expnd0\expndtw0 (\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 3] = final_states [counter, 3] = spatial_var_brack[spV]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 4:6] = temp_results\
+final_states [counter, 4:6]  = temp_results[gens,]\
+counter = counter+1\
+\}\
+\}\
+\}\
+colnames(final_states) = c("Press_Intensity", "Press_Time", "Spatial_Var", "Time_Step", "Driver_Var", "State")\
+colnames(results) = c("Press_Intensity", "Press_Time", "Spatial_Var", "Time_Step", "Driver_Var", "State")\
+return(list(results,  final_states))\
+\}\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+#end function for factorial simulations of Model 2\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+\
+#to get the data used for figures, use following code (after 'uncommenting' it):\
+#Carpenter_fact_data = Carpenter_factorial (spatial_var_brack=spatial_var_brack, dur_brack=dur_brack, mag_brack=mag_brack)[[2]]\
+\
+\
+\
+##############################################################################################\
+# Start of lake turbidity model (Model 3 in Box 2)\
+##############################################################################################\
+\
+\
+#Parameters for Model 2, all following Table S2 unless otherwise noted\
+E0 = 0.2\
+re  = 0.1\
+rv = 0.05\
+hv = 0.2\
+p = 4\
+Spatial_var = 2  # the "he" parameter, a source of spatial heterogeneity\
+delta_t = 0.001\
+gens = 500 #time-steps\
+State_start = 1 #initial conditions\
+Driver_start = 6.2 #driver variable value before and after press\
+Driver_pulse_amt = 1.5 #press intensity, for single run of model\
+Driver_pulse_dur = 2 #press duration, for single run of model\
+spatial_var_brack= 2 #sequence for all factorial values of press intensity and duration; this one is for the he parameter \
+dur_brack= seq(0, 20, 0.01) # sequence for all factorial values of press intensity and duration; this one is for press duration\
+mag_brack=seq(2, 12, 0.05) # sequence for all factorial values of press intensity and duration; this one is for press intensity\
+\
+\
+#The eqn for light availability in Model 3\
+Light_growth_func = function(re, E, hv, Eo, V, delta_t) \{\
+X_t_plus_1 =  Eo*hv/(hv+V)\
+return(X_t_plus_1)\
+\}\
+\
+#Macrophyte growth function for Model 3\
+Macrophye_growth_func = function(rv, V, he, p, E, delta_t) \{\
+dXdt = delta_t * (rv*V*(1-V*(he^p + E^p)/he^p))\
+return(dXdt)\
+\}\
+\
+#function for performing a single run of Model 3\
+Scheffer_single_run = function (Driver_start, Driver_pulse_amt, Driver_pulse_dur, Spatial_var, gens, delta_t,  State_start)\{\
+\
+#column 3 is vertical light attenuation, column 4 is macrophyte cover\
+results = matrix(NA, nrow = gens/delta_t, ncol = 4)\
+results[1,3] = (Driver_start*hv)/(hv+State_start)\
+results[1,4] = State_start\
+\
+#this matrix holds the driver variable over time\
+Driver_mat = matrix(Driver_start, nrow = gens/delta_t, ncol =1)\
+Driver_mat[(100/delta_t):(100/delta_t+Driver_pulse_dur/delta_t)] = Driver_start+Driver_pulse_amt\
+\
+\
+for(t in 1:(gens/delta_t-1))\{\
+results[t+1,3] = Light_growth_func (re, E=results[t,3], hv, Eo=Driver_mat[t], V=results[t,4], delta_t) \
+results[t+1,4] = results[t,4] + Macrophye_growth_func (rv, V=results[t,4], he=Spatial_var, p, E=results[t,3], delta_t) \
+\}\
+\
+final_results = matrix(NA, nrow=gens, ncol=4)\
+colnames(final_results) = c("Time_Step", "Driver_Var", "Light", "State_Var") \
+for(g in 1:gens)\{\
+final_results[g, 1] = g\
+final_results[g, 2] = Driver_mat[(g/delta_t)]\
+final_results[g, 3] = results[(g/delta_t), 3]\
+final_results[g, 4] = results[(g/delta_t), 4]\
+\}\
+return(final_results)\
+\}\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+#end function for a single run of Model 3\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+\
+#this function assesses factorial combinations of press duration, press intensity, and the he parameter for Model 3\
+Scheffer_factorial = function (spatial_var_brack, dur_brack, mag_brack, func_name)\{\
+counter = 1\
+#this matrix holds the results for each combination of press duration, press intensity, and vegetation growth rate (and for each time step)\
+results = matrix(NA, nrow = gens*length(spatial_var_brack)*length(dur_brack)*length(mag_brack), ncol = 7)\
+\
+#this matrix is the final state (last time step) for each combination of press duration, press intensity, and vegetation growth rate\
+final_states = matrix (NA, nrow = length(spatial_var_brack)*length(dur_brack)*length(mag_brack), ncol = 7)\
+\
+\
+for(spV in 1:length(spatial_var_brack)) \{\
+for(dur in 1:length(dur_brack)) \{\
+for(mag in 1:length(mag_brack)) \{\
+\
+temp_results = Scheffer_single_run(Driver_start=Driver_start, Driver_pulse_amt=mag_brack[mag], Driver_pulse_dur=dur_brack[dur], Spatial_var=spatial_var_brack[spV], gens=gens, delta_t=delta_t,  State_start=State_start)\
+\pard\pardeftab720\partightenfactor0
+\cf0 \expnd0\expndtw0\kerning0
+begin = 1+(counter-1)*gens\
+ending = counter*gens\'a0\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 \
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 1] = final_states [counter, 1]= mag_brack[mag]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 2] = final_states [counter, 2] = dur_brack[dur]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens):\kerning1\expnd0\expndtw0 (\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 3] = final_states [counter, 3] = spatial_var_brack[spV]\
+results [(\expnd0\expndtw0\kerning0
+1+(counter-1)*gens)\kerning1\expnd0\expndtw0 :(\expnd0\expndtw0\kerning0
+counter*gens)\kerning1\expnd0\expndtw0 , 4:7] = temp_results[, ]\
+final_states [counter, 4:7]  = temp_results[gens, ]\
+counter = counter+1\
+\}\
+\}\
+\}\
+colnames(final_states) = c("Press_Intensity", "Press_Duration", "Spatial_Var", "Time_Step", "Driver_Var", "Light_State", "Veg_State")\
+colnames(results) = c("Press_Intensity", "Press_Time", "Spatial_Var", "Time_Step", "Driver_Var", "Light_State", "Veg_State")\
+return(list(results,  final_states))\
+\}\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+#end function for factorial simulations of Model 3\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+\
+#to get the data used for figures, use following code (after 'uncommenting' it):\
+#Scheffer_fact_data = Scheffer_factorial (spatial_var_brack=spatial_var_brack, dur_brack=dur_brack, mag_brack=mag_brack)[[2]]\
+\
+\
+###########################################################################################\
+# Start of the tropical tree cover model (Model 4 in Box 2)\
+###########################################################################################\
+\
+#Parameters for Model 2, all following Table S2 unless otherwise noted\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+alpha = 4\
+beta = 6\
+gamma = 6\
+FRI = 7 #fire return interval\
+ha = 0.1\
+hc = 0.57\
+hi = 0.15\
+hp = 80\
+h_smi = 1800 #same as h_s\
+K = 0.9\
+ma = 0.15\
+Spatial_var = 0.3 # the rm parameter for single runs\
+gens = 500 #time steps\
+delta_t = 0.001\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 State_start\expnd0\expndtw0\kerning0
+ = 0.3 #initial conditions\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+Driver_start = 2000 #driver variable value before and after press\
+Driver_pulse_mag = 400 #press intensity for single runs\
+Driver_pulse_time = 50 #press duration for single runs\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 spatial_var_brack= 0.3 # sequence for all factorial values of press intensity and duration; this one is for the rm parameter \
+dur_brack= seq(0, 40, 0.1) # sequence for all factorial values of press intensity and duration; this one is for press duration\
+mag_brack=seq(0, 500, 1) # sequence for all factorial values of press intensity and duration; this one is for press intensity\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+\
+\
+#the eqn for Model 4\
+Tree_growth_func = function(rm, X, P, hc, beta, h_smi, hp, ma, FRI, hi, gamma, delta_t) \{\
+Int = hc^beta/(hc^beta+X^beta) * h_smi^beta/(h_smi^beta + P^beta)\
+rm. = rm*P/(hp+P)\
+new_X = rm.*X*(1-X/K) - ma*X*ha/(X+ha)-X*1/FRI*Int^gamma/(hi^gamma+Int^gamma)\
+new_X = X+new_X*delta_t\
+if(new_X<0) new_X = 0\
+return(new_X)\
+\}\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 #this function assesses factorial combinations of press duration, press intensity, and the rm parameter for Model 4\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+SavFor_single_run= function(gens, State_start, Driver_start, Driver_pulse_mag, Driver_pulse_time, Spatial_var)\{\
+\
+counter = 1\
+counter2 = 0\
+counter3 = 1\
+\
+\
+final_run = matrix(NA, nrow=1, ncol = 4)\
+results=matrix(NA, nrow = gens, ncol =\'a0 4)\'a0\
+\'a0\
+gens_length = gens/delta_t\
+one_gen = 1/delta_t\
+\
+State_array = matrix(State_start, nrow=gens_length, ncol=1)\
+\
+Driver_mat = matrix(Driver_start, nrow = gens_length, ncol =1)\
+Driver_mat[(100/delta_t):(100/delta_t+Driver_pulse_time/delta_t)] = Driver_start + Driver_pulse_mag\
+\
+\
+for(i in 1:(gens_length))\{\
+\
+#standard growth/competition dynamics\
+State_array [i+1]=\'a0 Tree_growth_func (rm=Spatial_var, X=State_array[i], P=Driver_mat[i], hc, beta, h_smi, hp, ma, FRI, hi, gamma, delta_t)\
+\
+counter2 = counter2 +1\
+\
+if(counter2==one_gen)\{\
+\
+results[counter3,1]\'a0 = (i)*delta_t\
+results[counter3,2]\'a0 = Driver_mat[i]\
+results[counter3,3]\'a0 = Spatial_var\
+results[counter3, 4] = State_array[i]\
+\
+counter2= 0\
+counter3 = counter3+1\
+\}\
+\
+\} #time brack\
+\
+final_run[, 1] = Driver_pulse_mag\
+final_run[, 2] = Driver_pulse_time\
+final_run[, 3] = Spatial_var\
+final_run[, 4] = State_array[gens/delta_t]\
+\
+colnames(results) = c("Time_Step", "Driver_Var", "Spatial_Var", "State")\
+colnames(final_run)= c("Press_Intensity", "Press_Duration", "Spatial_Var", "State")\
+\
+return(list(results, final_run))\
+\}\
+#end function for a single run of Model 4\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \kerning1\expnd0\expndtw0 #this function assesses factorial combinations of press duration, press intensity, and the rm parameter for Model 4\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720
+\cf0 \expnd0\expndtw0\kerning0
+SavFor_factorial = function (mag_brack, dur_brack, spatial_var_brack)\{\
+\
+last_run_results= matrix(NA, nrow = length(mag_brack)*length(dur_brack)*length(spatial_var_brack), ncol = 4)\
+full_results = matrix(NA, nrow=gens*length(mag_brack)*length(dur_brack)*length(spatial_var_brack), ncol = 7)\
+\
+counter = 1\
+for(mag in 1:length(mag_brack))\{\
+for(dur in 1:length(dur_brack))\{\
+for(spV in 1:length(spatial_var_brack))\{\
+temp = SavFor_single_run( gens, State_start=State_start, Driver_start=Driver_start, Driver_pulse_mag=mag_brack[mag], Driver_pulse_time=dur_brack[dur], Spatial_var=spatial_var_brack[spV])\
+\
+last_run_results[counter,] = temp[[2]]\
+\
+begin = 1+(counter-1)*gens\'a0\
+ending = counter*gens\'a0\
+full_results[begin:ending,1:4]\'a0 = temp[[1]]\
+full_results[begin:ending, 5] = mag_brack[mag]\
+full_results[begin:ending, 6] = dur_brack[dur]\
+full_results[begin:ending, 7] = spatial_var_brack[spV]\
+\
+counter = counter+1\
+\
+\}\
+\}\
+\}\
+colnames(last_run_results) = c("Press_Intensity", "Press_Duration", "Spatial_Var", "State")\
+return = list(full_results, last_run_results)\
+\}\
+#end function for factorial simulations of Model 4\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf3 \kerning1\expnd0\expndtw0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 #to get the data used for figures, use following code (after 'uncommenting' it):\
+#SavFor_fact_data = SavFor_factorial (spatial_var_brack=spatial_var_brack, dur_brack=dur_brack, mag_brack=mag_brack)[[2]]}
