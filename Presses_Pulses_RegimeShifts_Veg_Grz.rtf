@@ -1,0 +1,392 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Consolas;}
+{\colortbl;\red255\green255\blue255;\red63\green105\blue30;\red100\green70\blue0;\red102\green57\blue0;
+\red102\green0\blue141;\red221\green32\blue103;\red164\green8\blue0;\red77\green77\blue77;\red32\green0\blue99;
+}
+\margl1440\margr1440\vieww27260\viewh14860\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs36 \cf0 ###########################################################################################\
+#  The following code is functions to run the vegetation-grazing model simulations from \
+#  "The interactive effects of press/pulse intensity and duration on regime shifts at multiple scales"\
+###########################################################################################\
+\
+#All of these parameters or simulation characteristics (i.e. number of time-steps or iterations)\
+#follow equations in the main text unless otherwise noted.\
+\
+install.packages("moments")\
+\
+noise_strength = 0.0 #strength of white noise\
+K=10 #carrying capacity \
+delta_t = 0.01 #dt\
+p = 2 #hill function exponent\
+V0 = 9 #initial vegetation biomass\
+gens = 300 #number of time steps\
+pops = 50 #the number of patches in dimension i and j of the spatially explicit model\
+diff_rate = 0.01 #the D parameter in eqn 2, for the spatially explicit model\
+r=0.7 #maximum vegetation growth rate\
+iter = 100 #number of iterations, same for all functions that iterate \
+driver_press_topo = "abrupt" #change to "gradual" to for presses that change incrementally (i.e. Box 1)\
+\
+\
+#Altering these will alter the parameters fed into the factorial iterator for the non-spatially explicit model (e.g. Fig 4 and 5)\
+#To reproduce panels in fig 3 and to 11 you will often need to hold some parameters constant.\
+#For instance, if you want to just look at the effect of duration, set mag_brack to a single value (e.g. mag_brack=0.8) and r_brack to a single value(e.g. r_brack=0.7), and then have dur_brack take on several values(e.g. dur_brack = seq(1, 40, 0.5)).\
+\
+Grz_Start = 1.4 #the grazing rate before and after press\
+mag_brack = seq(0, 1.5, 0.05) #all values of press intensity that will be assessed \
+dur_brack = seq(1, 40, 0.5) #all values of press duration that will be assessed\
+r_brack = seq(0.6, 1, 0.1) #all values of vegetation growth rate that will be assessed\
+\
+#altering these will alter the parameters fed into the spatially explicit model\
+Grz_Start = 1.7  #the grazing rate before and after press\
+Driver_press_mag = 1 #press intensity for the spatially explicit model\
+Driver_press_dur = 7 #press duration for the spatial explicit model\
+r_het = 0.05 #standard deviation of the normal distribution used to determine the vegetation growth rate in the spatial explicit model\
+r_mean = 0.8 #mean of the normal distribution used to determine the vegetation growth rate in the spatial explicit model\
+mag_brack = seq(0.7, 1.1, 0.1) #all values of press intensity that will be assessed \
+dur_brack = seq(5, 13, 1) #all values of press duration that will be assessed\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf2 #this function is outputs the change in vegetation biomass over a time, dt. \
+#Note that this isn't for the spatially explicit model\
+May_growth_func = function(r, K, c, X, p, delta_t, noise_strength) \{\
+dXdt = delta_t *( r*X*(1-X/K) - c * X^p / (X^p+1))+ rnorm(1, 0, 1) * \{noise_strength*delta_t^.5\}\
+return(dXdt)\
+\}\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf3 #the following function performs a single simulation of the non-spatially explicit model (i.e. an iteration), based on eqn 1,2\
+May_single_run = function (K, gens, delta_t, Grz_Start, Grz_Pulse_amt, Grz_Pulse_time, r, V0, noise_strength)\{\
+\
+#this matrix holds the results of the simulation\
+results = matrix(NA, nrow = gens/delta_t, ncol = 3)\
+results[1,3] = V0\
+colnames(results) = c("Time", "Grazing", "Veg_Biomass")\
+\
+#this matrix holds the grazing rate over time\
+Grz_mat = matrix(Grz_Start, nrow = gens/delta_t, ncol =1)\
+Grz_mat[(50/delta_t):(50/delta_t+Grz_Pulse_time/delta_t)] = Grz_Start+Grz_Pulse_amt \
+if (driver_press_topo == "gradual") \cf4 Grz_mat[(50/delta_t):(50/delta_t+Grz_Pulse_time/delta_t)] =  seq(from = Grz_Start, to =Grz_Pulse_amt+Grz_Start, length.out = Grz_Pulse_time/delta_t+1)\cf3 \
+results[,2] = Grz_mat\
+\
+\
+for(t in 1:(gens/delta_t-1))\{\
+results[t+1, 3] =  results[t,3] + May_growth_func(r=r, K=K, c=Grz_mat[t], X=results[t,3], delta_t, p=p, noise_strength=noise_strength)\
+if (results[t+1,3]<=0) results[t+1,3] =0\
+\}\
+\
+\
+final_results = matrix(NA, nrow=gens, ncol=3)\
+for(g in 1:gens)\{\
+final_results[g, 1] = g\
+final_results[g, 2] = results[(g/delta_t), 2]\
+final_results[g, 3] = results[(g/delta_t), 3]\
+\}\
+\
+colnames(final_results) = c("Time", "Grazing", "Veg_Biomass")\
+return(final_results)\
+\}
+\f1 \expnd0\expndtw0\kerning0
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0 \cf0 \kerning1\expnd0\expndtw0 \
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf5 #this function assesses factorial combinations of press duration, press intensity, and vegetation growth rate \
+#applies to the non spatially explicit model (i.e. eqn 1,2)\
+press_veg_growth_factorial_May = function (r_brack, dur_brack, mag_brack, iter)\{\
+counter = 1\
+#this matrix holds the results for each combination of press duration, press intensity, and vegetation growth rate (and for each time step)\
+results = matrix(NA, nrow = gens*length(r_brack)*length(dur_brack)*length(mag_brack)*iter, ncol = 6)\
+\
+#this matrix is the final state (last time step) for each combination of press duration, press intensity, and vegetation growth rate\
+final_states = matrix (NA, nrow = length(r_brack)*length(dur_brack)*length(mag_brack)*iter, ncol = 6)\
+\
+\
+for(r. in 1:length(r_brack)) \{\
+for(dur in 1:length(dur_brack)) \{\
+for(mag in 1:length(mag_brack)) \{\
+for(i in 1:iter) \{\
+temp_results = May_single_run (K=K, r=r_brack[r.], gens=gens, delta_t=delta_t, Grz_Start=Grz_Start, Grz_Pulse_amt= mag_brack[mag], Grz_Pulse_time=dur_brack[dur], V0=V0, noise_strength=noise_strength)\
+\pard\pardeftab720\partightenfactor0
+\cf5 \expnd0\expndtw0\kerning0
+begin = 1+(counter-1)*gens\'a0\
+ending = counter*gens\'a0\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf5 \kerning1\expnd0\expndtw0 \
+results [begin:ending, 1] = final_states [counter, 1]= mag_brack[mag]\
+results [begin:ending, 2] = final_states [counter, 2] = dur_brack[dur]\
+results [begin:ending, 3] = final_states [counter, 3] = r_brack[r.]\
+results [begin:ending, 4:6] = temp_results\
+final_states [counter, 4:6]  = temp_results[gens,]\
+counter = counter+1\
+\}\
+\}\
+\} \
+\}\
+colnames(final_states) = c("Press_Intensity", "Press_Time", "Veg_Growth_Rate", "Time_Step", "Grazing_Param", "Biomass")\
+colnames(results) = c("Press_Intensity", "Press_Time", "Veg_Growth_Rate", "Time_Step", "Grazing_Param", "Biomass")\
+return(list(results,  final_states))\
+\}\
+\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf6 #This function is outputs the the vegetation biomass for a time t+dt\
+#Note that this is for the spatially explicit model, eqn 3.\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf6 May_growth_func_spatial = function(r, c, X, delta_t, State_left, State_right, State_up, State_down, Diff_left, Diff_right, Diff_up, Diff_down) \{\
+new_X = r*X*\{1-X/10\} - c * X^2 / \{X^2+1\} + diff_rate* \{State_left*Diff_left+State_right*Diff_right+State_up*Diff_up+State_down*Diff_down-\{Diff_left+Diff_right+Diff_up+Diff_down\}*X\}\
+new_X = X+new_X*delta_t\
+if(new_X<0) new_X = 0\
+return(new_X)\
+\}\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+#This function is used to calculated Moran's I. The function is from the "earlywarnings" package in R. \
+#See Dakos et al. 2012, Kefi, Guttal, et al. 2014 for further details.\
+morancorrelation_ews <- function(input)	\{\
+m <- mean(as.vector(input))\
+v <- var(as.vector(input))\
+n <- (nrow(input)-1)\
+moranI <- 0\
+for (i in 2:n)\{\
+for (j in 2:n) \{\
+moranI <- moranI + (input[i,j]-m)*(input[i,j-1]+input[i,j+1]+input[i-1,j]+input[i+1,j]-4*m)\
+\}\
+\}\
+moranI <- moranI/(4*v*(n-2)*(n-2))\
+return(moranI)\
+\}\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf7 #Runs a single simulation run for the spatially explicit model, eqn 3.\
+May_single_run_spatial = function(diff_rate, gens, pops, V0, r_mean, r_het, Grz_start, Driver_press_mag, Driver_press_dur)\{\
+\
+#the differ "counter" are used for indexing different arrays/matrices\
+counter = 1\
+counter2 = 0\
+counter3 = 1\
+\
+#number of dt's that make up one time step\
+one_gen = 1/delta_t # one generation in dt equivalents\
+\
+#the entire length of the simulation\
+gens_length = gens/delta_t\
+\
+#matrix for holding the results of the final run\
+final_run = matrix(NA, nrow=1, ncol = 7)\
+colnames(final_run) = c("Pulse_Mag", "Pulse_Dur", "Mean State", "25th Quantile State", "75th Quantile State", "5th Quantile State", "95th Quantile State")\
+\
+#matrix for holding summary results of each time step\
+results=matrix(NA, nrow = gens, ncol =  12) \
+results[,2] = r_het\
+results[,3] = diff_rate\
+colnames(results) = c("Time", "r_het", "diff_rate", "Grazing rate", "Mean_State", "25th Quantile State", "75th Quantile State", "5th Quantile State", "95th Quantile State", "Spatial_var", "Spatial_skew", "Spatial_autocorrel")\
+\
+# matrix for holding a sample of results from 20 single patches over time\
+wide_results = matrix(NA, nrow = gens, ncol = 21)\
+colnames(wide_results) = c("Time", "Veg_Patch1", "Veg_Patch2", "Veg_Patch3", "Veg_Patch4", "Veg_Patch5", "Veg_Patch6", "Veg_Patch7", "Veg_Patch8", "Veg_Patch9", "Veg_Patch10", "Veg_Patch11", "Veg_Patch12", "Veg_Patch13", "Veg_Patch14", "Veg_Patch15", "Veg_Patch16", "Veg_Patch17", "Veg_Patch18", "Veg_Patch19", "Veg_Patch20")\
+\
+#matrix for holding the final values of each patch\
+all_patches = array(NA, dim=c(4,pops,pops))\
+\
+#the array for holding values of the state variabe\
+State_array = array(V0, dim=c(gens_length+1, pops+2, pops+2))\
+# dim 1 is time \
+# dim 2 is y coordinate\
+# dim 3 is x cord. done this way because rows (y) are the first argument when we call diffusion and growth rate matrices\
+\
+#matrix holding the diffusion rates for each patch\
+#note that the spatial domain has edges, hence the values of "0" for the first row, last row, first column, and last column\
+diff_mat = matrix(1, nrow=pops+2, ncol=pops+2)\
+diff_mat[1,]= diff_mat[,1] = diff_mat[pops+2,] = diff_mat[,pops+2] = 0 \
+\
+#this matrix holds the "r" values for each patch\
+r_mat = matrix(rnorm((pops+2)^2, r_mean, r_mean*r_het), nrow=pops+2) \
+\
+#matrix of grazing rates over time\
+Driver_mat = matrix(Grz_Start, nrow = gens_length, ncol =1)\
+Driver_mat[(50/delta_t):(50/delta_t+Driver_press_dur/delta_t)] = Grz_Start + Driver_press_mag\
+\
+for(i in 1:(gens_length))\{\
+c. = Driver_mat[i]\
+for(py in 1:(pops))\{\
+y=py+1\
+for(px in 1:(pops))\{\
+x=px+1\
+\
+#standard growth/competition dynamics, along with spatial dynamics\
+State_array [i+1, y, x]=May_growth_func_spatial (r=r_mat[y,x], c= c., X=State_array [i, y, x] , delta_t, State_left=State_array[i, y, x-1], State_right=State_array[i, y, x+1], State_up =  State_array[i, y-1, x], State_down =  State_array[i,y+1, x],  Diff_left = diff_mat[y, x-1], Diff_right = diff_mat[y, x+1], Diff_up = diff_mat[y-1, x], Diff_down = diff_mat[y+1, x])\
+\
+\} #time brack\
+\}# y brack\
+counter2 = counter2 +1\
+\
+#an if statement to collect one result each time step \
+if(counter2==one_gen)\{\
+results[counter3,1]  = wide_results[counter3, 1] = (i)*delta_t\
+results[counter3,4]  = Driver_mat[i]\
+results[counter3, 5] = mean(State_array[i , 2:(pops+1), 2:(pops+1)])\
+results[counter3, 6:9] = quantile(State_array[i, 2:(pops+1), 2:(pops+1)], probs = c(0.25, .75, 0.05, 0.85), na.rm =TRUE)\
+results[counter3, 10] = var(as.vector(State_array[i, 2:(pops+1), 2:(pops+1)]))\
+results[counter3, 11] = skewness(as.vector(State_array[i, 2:(pops+1), 2:(pops+1)]))\
+results[counter3, 12] = \expnd0\expndtw0\kerning0
+morancorrelation_ews (input=\kerning1\expnd0\expndtw0 State_array[i, 2:(pops+1), 2:(pops+1)])\
+\
+wide_results[counter3, 2:21] =  State_array[i, 2:21, 20]\
+\
+counter2= 0\
+counter3 = counter3+1\
+\}\
+\
+\}# x brack\
+\
+\
+final_run[, 1] = Driver_press_mag\
+final_run[, 2] = Driver_press_dur\
+final_run[, 3] = mean(State_array[gens_length , 2:(pops+1), 2:(pops+1)])\
+final_run[, 4:7] = quantile(State_array[gens_length , 2:(pops+1), 2:(pops+1)], probs = c(0.25, 0.75, 0.05, .95), na.rm =TRUE)\
+\
+#position [1,,] is the values of parameter "r", [2,,] is vegetation before the press, [3,,] is vegetation at the end of the press, and [4,,] is vegetation after the recovery period   \
+all_patches[1,,] = r_mat[2:(pops+1), 2:(pops+1)]\
+all_patches[2,,] = State_array[(50/delta_t) , 2:(pops+1), 2:(pops+1)]\
+all_patches[3,,] = State_array[((50+Driver_press_dur)/delta_t) , 2:(pops+1), 2:(pops+1)]\
+all_patches[4,,] = State_array[gens_length , 2:(pops+1), 2:(pops+1)]\
+\
+return(list(results, final_run, wide_results, all_patches))\
+\}\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 #function to iterate the spatially explicit model for one press duration and intensity (based on eqn 3)\
+Spatially_explict_iterator=  function(iter, r_het, diff_rate, Driver_press_mag, Driver_press_dur) \{\
+\pard\pardeftab720\partightenfactor0
+\cf8 \expnd0\expndtw0\kerning0
+counter = 1\
+results_matrix = matrix(NA, nrow = iter*gens, ncol = 12)\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 last_run_results = matrix(NA, nrow = iter, ncol = 7)\
+\
+for(i in 1:iter)\{\
+\
+temp=  May_single_run_spatial (diff_rate=diff_rate, gens=gens, pops, V0, r_mean, r_het=r_het, Grz_Start, Driver_press_dur=Driver_press_dur, Driver_press_mag=Driver_press_mag)\
+\
+last_run_results[i, ] = temp[[2]]\
+\
+\pard\pardeftab720\partightenfactor0
+\cf8 \expnd0\expndtw0\kerning0
+begin = 1+(counter-1)*gens\'a0\
+ending = counter*gens\'a0\kerning1\expnd0\expndtw0 \
+\expnd0\expndtw0\kerning0
+results_matrix[begin:ending,]  = \kerning1\expnd0\expndtw0  temp[[1]]\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 \
+counter = counter+1\
+\}\
+\
+last_run_summary = matrix(NA, nrow = 1, ncol = 6)\
+colnames(last_run_summary) = c("Press_intensity", "Press_duration", "Mean_cover", "5th_of_MeanCover", "50th_of_MeanCover", "95th_of_MeanCover")\
+last_run_summary[,3] = mean(last_run_results[,3],  na.rm = TRUE)\
+last_run_summary[,4:6] = quantile(last_run_results[,3], probs = c(0.05, 0.50, 0.95), na.rm = TRUE)\
+\
+\
+#summary_results, though vaguely named \
+\pard\pardeftab720\partightenfactor0
+\cf8 \expnd0\expndtw0\kerning0
+summary_results = matrix(NA, nrow = gens, ncol = 17)\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 \kerning1\expnd0\expndtw0 colnames(summary_results) = c("Press_intensity", "Press_duration", "Time_Step", "Grz_param", "Mean_cover", "5th_of_MeanCover", "50th_of_MeanCover", "95th_of_MeanCover", "Mean_Spat_Var", "Spat_Var_5th", "Spat_Var_95th", "Mean_Spat_Skew", "Spat_Skew_5th", "Spat_Skew_95th", "Mean_Spat_Autocorrel", "Spat_Autocorrel_5th", "Spat_Autocorrel_95th")\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 \expnd0\expndtw0\kerning0
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 \kerning1\expnd0\expndtw0 last_run_summary[,1] = \expnd0\expndtw0\kerning0
+summary_results[,1] = \kerning1\expnd0\expndtw0 Driver_press_mag\
+last_run_summary[,2] = \expnd0\expndtw0\kerning0
+summary_results[,2] = \kerning1\expnd0\expndtw0 Driver_press_dur\expnd0\expndtw0\kerning0
+\
+\pard\pardeftab720\partightenfactor0
+\cf8 \expnd0\expndtw0\kerning0
+#summary_results[,1:2] = \kerning1\expnd0\expndtw0  last_run_results[,1:2]\expnd0\expndtw0\kerning0
+\
+\
+for(g in 1:gens)\{\
+data_subset = subset(results_matrix, results_matrix[,1]==g)\
+print(data_subset)\
+summary_results[g,3] =g\
+summary_results[g,4]=results_matrix[g,4]\
+summary_results[g,5]=mean(data_subset[,5]\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,6:8]=quantile(data_subset[,5], probs = c(0.05, 0.50, 0.95)\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,9]=mean(data_subset[,10]\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,10:11]=quantile(data_subset[,10], probs = c(0.05, 0.95)\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,12]=mean(data_subset[,11]\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,13:14]=quantile(data_subset[,11], probs = c(0.05, 0.95)\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,15]=mean(data_subset[,12]\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+summary_results[g,16:17]=quantile(data_subset[,12], probs = c(0.05, 0.95)\kerning1\expnd0\expndtw0 , na.rm = TRUE\expnd0\expndtw0\kerning0
+)\
+\}\kerning1\expnd0\expndtw0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf8 \
+return(list(last_run_summary, summary_results))\
+\}\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf9 \
+#function for factorial combinations of press intensity and press duration for the spatially explicit model, based on eqn 3 (main text).\
+intensity_duration_factorial = function (iter, mag_brack, dur_brack)\{\
+\
+#summary of the final time step\
+last_run_results= matrix(NA, nrow = length(mag_brack)*length(dur_brack), ncol = 8)\
+\
+\
+#summary of results from each time step\
+full_results = matrix(NA, nrow=gens*length(mag_brack)*length(dur_brack), ncol = 19)\
+\
+full_results[,1]=last_run_results[,1]=diff_rate\
+full_results[,2]=last_run_results[,2]=r_het\
+\
+counter = 1\
+for(mag in 1:length(mag_brack))\{\
+for(dur in 1:length(dur_brack))\{\
+temp = Spatially_explict_iterator(iter, r_het, diff_rate, Driver_press_mag=mag_brack[mag], Driver_press_dur=dur_brack[dur])\
+\
+last_run_results[counter,3:8] = temp[[1]]\
+\
+\pard\pardeftab720\partightenfactor0
+\cf9 \expnd0\expndtw0\kerning0
+begin = 1+(counter-1)*gens\'a0\
+ending = counter*gens\'a0\
+\kerning1\expnd0\expndtw0 \
+\expnd0\expndtw0\kerning0
+full_results[begin:ending, \kerning1\expnd0\expndtw0 3:19\expnd0\expndtw0\kerning0
+]  = temp[[2]]\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf9 \kerning1\expnd0\expndtw0 counter = counter+1\
+\}\
+\}\
+\
+\
+colnames(last_run_results) = c("Diffusion Rate", "Growth Heterogeneity", "Press_intensity", "Press_duration", "Mean_cover", "5th_of_MeanCover", "50th_of_MeanCover", "95th_of_MeanCover")\
+colnames(full_results) = c("Diffusion Rate", "Growth Heterogeneity", "Press_intensity", "Press_duration", "Time_Step", "Grz_param", "Mean_cover", "5th_of_MeanCover", "50th_of_MeanCover", "95th_of_MeanCover","Mean_Spat_Var", "Spat_Var_5th", "Spat_Var_95th", "Mean_Spat_Skew", "Spat_Skew_5th", "Spat_Skew_95th", "Mean_Spat_Autocorrel", "Spat_Autocorrel_5th", "Spat_Autocorrel_95th")\
+\
+return = list(last_run_results,  full_results)\
+\}\
+\
+}
